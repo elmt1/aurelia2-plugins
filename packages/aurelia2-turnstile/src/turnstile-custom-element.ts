@@ -16,6 +16,9 @@ export class TurnstileCustomElement implements ICustomElementViewModel {
     private container!: HTMLElement;
     private widgetId: string | undefined;
     private scriptLoaded = false;
+    private isAttached = false;
+    private loadingScript: HTMLScriptElement | undefined;
+    private apiPollingInterval: ReturnType<typeof setInterval> | undefined;
 
     constructor(
         private readonly element: HTMLElement,
@@ -23,6 +26,8 @@ export class TurnstileCustomElement implements ICustomElementViewModel {
     ) {}
 
     attached() {
+        this.isAttached = true;
+
         const resolvedSitekey = this.sitekey || this.config.get('sitekey') || '';
         if (!resolvedSitekey) {
             console.error('Turnstile sitekey is required. Provide it via bindable or configuration.');
@@ -41,6 +46,15 @@ export class TurnstileCustomElement implements ICustomElementViewModel {
     }
 
     detached() {
+        this.isAttached = false;
+        this.clearApiPollingInterval();
+
+        if (this.loadingScript) {
+            this.loadingScript.onload = null;
+            this.loadingScript.onerror = null;
+            this.loadingScript = undefined;
+        }
+
         if (this.widgetId !== undefined && (window as any).turnstile) {
             (window as any).turnstile.remove(this.widgetId);
             this.widgetId = undefined;
@@ -59,6 +73,10 @@ export class TurnstileCustomElement implements ICustomElementViewModel {
         script.async = true;
         script.defer = true;
         script.onload = () => {
+            if (!this.isAttached) {
+                return;
+            }
+
             this.scriptLoaded = true;
             this.onScriptReady();
         };
@@ -66,24 +84,41 @@ export class TurnstileCustomElement implements ICustomElementViewModel {
             console.error('Failed to load Turnstile script.');
         };
         document.head.appendChild(script);
+        this.loadingScript = script;
     }
 
     private onScriptReady() {
+        if (!this.isAttached) {
+            return;
+        }
+
         if ((window as any).turnstile) {
             this.renderTurnstile();
         } else {
-            // Script element exists but API not yet available; poll briefly
+            this.clearApiPollingInterval();
             let attempts = 0;
-            const interval = setInterval(() => {
+            this.apiPollingInterval = setInterval(() => {
+                if (!this.isAttached) {
+                    this.clearApiPollingInterval();
+                    return;
+                }
+
                 attempts++;
                 if ((window as any).turnstile) {
-                    clearInterval(interval);
+                    this.clearApiPollingInterval();
                     this.renderTurnstile();
                 } else if (attempts > 50) {
-                    clearInterval(interval);
+                    this.clearApiPollingInterval();
                     console.error('Turnstile API did not become available.');
                 }
             }, 100);
+        }
+    }
+
+    private clearApiPollingInterval() {
+        if (this.apiPollingInterval !== undefined) {
+            clearInterval(this.apiPollingInterval);
+            this.apiPollingInterval = undefined;
         }
     }
 

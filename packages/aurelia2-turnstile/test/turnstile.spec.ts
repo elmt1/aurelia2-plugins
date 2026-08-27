@@ -252,6 +252,43 @@ describe('aurelia2-turnstile', () => {
             // Should not throw
             sut.detached();
         });
+
+        test('does not render when script loads after detached', () => {
+            const renderMock = jest.fn().mockReturnValue('widget-1');
+            const { sut } = createComponent({ sitekey: 'test-key' });
+
+            sut.attached();
+            const script = document.querySelector(
+                'script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]'
+            ) as HTMLScriptElement;
+
+            sut.detached();
+            (window as Window & { turnstile?: { render: typeof renderMock } }).turnstile = { render: renderMock };
+            script.onload?.(new Event('load'));
+
+            expect(renderMock).not.toHaveBeenCalled();
+        });
+
+        test('stops polling for the API after detached', () => {
+            jest.useFakeTimers();
+
+            try {
+                const existingScript = document.createElement('script');
+                existingScript.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+                document.head.appendChild(existingScript);
+                const renderMock = jest.fn().mockReturnValue('widget-1');
+                const { sut } = createComponent({ sitekey: 'test-key' });
+
+                sut.attached();
+                sut.detached();
+                (window as Window & { turnstile?: { render: typeof renderMock } }).turnstile = { render: renderMock };
+                jest.advanceTimersByTime(1000);
+
+                expect(renderMock).not.toHaveBeenCalled();
+            } finally {
+                jest.useRealTimers();
+            }
+        });
     });
 
     describe('TurnstileConfiguration', () => {
