@@ -1,5 +1,7 @@
-﻿import { faGear } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIconCustomElement, FontAwesomeIconRegistry } from './../src';
+﻿import { Registration } from '@aurelia/kernel';
+import { createFixture } from '@aurelia/testing';
+import { faGear } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIconCustomElement, FontAwesomeIconRegistry, IFontAwesomeIconRegistry } from './../src';
 
 describe('font-awesome-icon custom element', () => {
   test('renders svg markup from a registered string icon', () => {
@@ -33,6 +35,23 @@ describe('font-awesome-icon custom element', () => {
     expect(svg).not.toBeNull();
     expect(svg?.classList.contains('fa-spin')).toBe(true);
     expect(svg?.classList.contains('fa-2x')).toBe(true);
+  });
+
+  test('supports the bare spin attribute syntax', async () => {
+    const registry = new FontAwesomeIconRegistry();
+    registry.register([faGear]);
+
+    const { appHost, startPromise, tearDown } = createFixture(
+      '<font-awesome-icon icon="gear" spin></font-awesome-icon>',
+      {},
+      [FontAwesomeIconCustomElement, Registration.instance(IFontAwesomeIconRegistry, registry)]
+    );
+
+    await startPromise;
+
+    expect(appHost.querySelector('svg')?.classList.contains('fa-spin')).toBe(true);
+
+    await tearDown();
   });
 
   test('supports icon definition bindings', () => {

@@ -8,7 +8,7 @@ import { IFontAwesomeIconRegistry, type FontAwesomeIconInput } from './icon-regi
 export class FontAwesomeIconCustomElement {
     @bindable public icon!: FontAwesomeIconInput;
     @bindable public title?: string;
-    @bindable public spin = false;
+    @bindable({ set: coerceBoolean }) public spin = false;
     @bindable public size?: SizeProp;
 
     public iconContainer!: HTMLElement;
@@ -71,4 +71,8 @@ function describeIcon(iconValue: FontAwesomeIconInput): string {
     }
 
     return `${iconValue.prefix}:${iconValue.iconName}`;
+}
+
+function coerceBoolean(value: unknown): boolean {
+    return value === '' || value === true || value === 'true';
 }
